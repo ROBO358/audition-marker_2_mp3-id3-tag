@@ -10,7 +10,7 @@
 
 ## 使用方法
 
-```
+```sh
 go run ./... -csv <CSVファイルパス> -input <入力MP3パス> [-output <出力MP3パス>]
 ```
 
@@ -24,12 +24,12 @@ go run ./... -csv <CSVファイルパス> -input <入力MP3パス> [-output <出
 
 チャプターを追加して "podcast_with_chapters.mp3" として保存:
 
-```
+```sh
 go run ./... -csv "marker.csv" -input "podcast.mp3"
 ```
 
 別ファイルとして保存:
 
-```
+```sh
 go run ./... -csv "marker.csv" -input "podcast.mp3" -output "podcast_with_chapters.mp3"
 ```
