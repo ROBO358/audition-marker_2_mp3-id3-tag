@@ -151,14 +151,17 @@ func copyFile(src, dst string) error {
 
 // addChapterFrames adds chapter frames to ID3 tags
 func addChapterFrames(tag *id3v2.Tag, markers []csvparser.MarkerEntry) error {
-	// Remove existing chapter frames (to avoid duplication)
+	// Remove existing chapter and CTOC frames (to avoid duplication)
 	tag.DeleteFrames("CHAP")
+	tag.DeleteFrames("CTOC")
 
 	if len(markers) == 0 {
 		return nil // Do nothing if there are no markers
 	}
 
-	// Generate and add chapter frames for each marker
+	// Generate chapter frames and collect their element IDs
+	var chapterElementIDs []string
+
 	for i, marker := range markers {
 		// Skip markers with empty names
 		if strings.TrimSpace(marker.Name) == "" {
@@ -167,6 +170,7 @@ func addChapterFrames(tag *id3v2.Tag, markers []csvparser.MarkerEntry) error {
 
 		// Unique ID for chapter element
 		elementID := fmt.Sprintf("chp%d", i)
+		chapterElementIDs = append(chapterElementIDs, elementID)
 
 		// Create chapter frame
 		chapterFrame := createChapterFrame(elementID, marker.Name, marker.StartTime)
@@ -174,6 +178,19 @@ func addChapterFrames(tag *id3v2.Tag, markers []csvparser.MarkerEntry) error {
 		// Add chapter frame to tag
 		tag.AddFrame("CHAP", chapterFrame)
 	}
+
+	// If no valid chapters were created, return
+	if len(chapterElementIDs) == 0 {
+		return nil
+	}
+
+	// Create Table Of Contents frame referencing all chapters
+	tocFrameID := "toc"
+	tocTitle := "Table of Contents"
+	tocFrame := createCTOCFrame(tocFrameID, true, true, chapterElementIDs, tocTitle)
+
+	// Add the CTOC frame to the tag
+	tag.AddFrame("CTOC", tocFrame)
 
 	return nil
 }

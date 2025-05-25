@@ -109,6 +109,17 @@ func Execute() {
 		return
 	}
 
+	// Try to read TOC information
+	tocInfo, tocErr := id3tag.ReadTOC(targetFile)
+	if tocErr == nil {
+		fmt.Println("Table of Contents information:")
+		fmt.Printf("Title: %s\n", tocInfo.Title)
+		fmt.Printf("Is Top Level: %t\n", tocInfo.IsTopLevel)
+		fmt.Printf("Is Ordered: %t\n", tocInfo.IsOrdered)
+		fmt.Printf("Child Elements: %d\n", len(tocInfo.ChildIDs))
+		fmt.Println("------------------------------------------------------------")
+	}
+
 	fmt.Printf("Found %d chapters in the output file:\n", len(chapters))
 	fmt.Println("------------------------------------------------------------")
 	fmt.Printf("%-4s | %-12s | %s\n", "No.", "Start Time", "Title")
