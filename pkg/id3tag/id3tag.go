@@ -168,8 +168,6 @@ func addChapterFrames(tag *id3v2.Tag, markers []csvparser.MarkerEntry) error {
 		// Unique ID for chapter element
 		elementID := fmt.Sprintf("chp%d", i)
 
-		fmt.Printf("Chapter %d: %s (Start time: %s)\n", i+1, marker.Name, marker.StartTime)
-
 		// Create chapter frame
 		chapterFrame := createChapterFrame(elementID, marker.Name, marker.StartTime)
 

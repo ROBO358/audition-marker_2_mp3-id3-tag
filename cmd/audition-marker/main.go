@@ -83,12 +83,40 @@ func Execute() {
 		os.Exit(1)
 	}
 
+	// Determine which file has the chapters
+	targetFile := *inputMP3
+	if *outputMP3 != "" {
+		targetFile = *outputMP3
+	}
+
 	// Success message
 	if *outputMP3 == "" {
 		fmt.Printf("Complete! Chapter tags added to MP3 file '%s'\n", *inputMP3)
 	} else {
 		fmt.Printf("Complete! MP3 file with chapter tags output to '%s'\n", *outputMP3)
 	}
+
+	// Read and display the chapters from the output file
+	fmt.Println("\nVerifying chapters in the output file:")
+	chapters, err := id3tag.ReadChapters(targetFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Could not read chapters from the output file: %v\n", err)
+		return
+	}
+
+	if len(chapters) == 0 {
+		fmt.Println("No chapters found in the output file.")
+		return
+	}
+
+	fmt.Printf("Found %d chapters in the output file:\n", len(chapters))
+	fmt.Println("------------------------------------------------------------")
+	fmt.Printf("%-4s | %-12s | %s\n", "No.", "Start Time", "Title")
+	fmt.Println("------------------------------------------------------------")
+	for i, chapter := range chapters {
+		fmt.Printf("%-4d | %-12s | %s\n", i+1, id3tag.FormatDuration(chapter.StartTime), chapter.Title)
+	}
+	fmt.Println("------------------------------------------------------------")
 }
 
 // fileExists checks if a file exists

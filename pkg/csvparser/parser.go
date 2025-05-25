@@ -89,8 +89,6 @@ func ParseAuditionCSV(filepath string) ([]MarkerEntry, error) {
 			return nil, fmt.Errorf("failed to parse start time '%s': %w", startTimeStr, err)
 		}
 
-		fmt.Printf("Parsed marker: Name='%s', StartTime=%s\n", name, startTime)
-
 		// Add the marker to our list with zero EndTime
 		markers = append(markers, MarkerEntry{
 			Name:      name,
