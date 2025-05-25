@@ -15,16 +15,14 @@ import (
 
 // AddChapters adds chapter tags to an MP3 file
 func AddChapters(mp3Path string, markers []csvparser.MarkerEntry, outputPath string) error {
-	// If output path is not specified, create a new file with "_with_chapters" suffix
+	// If output path is not specified, create a new filename with "_with_chapters" suffix
 	if outputPath == "" {
-		ext := filepath.Ext(mp3Path)
-		baseName := mp3Path[:len(mp3Path)-len(ext)]
-		outputPath = baseName + "_with_chapters" + ext
+		outputPath = generateOutputPath(mp3Path)
 	}
 
-	// If input and output files are the same
+	// If input and output file paths are the same
 	if mp3Path == outputPath {
-		// Modify ID3 tags directly
+		// Modify the file directly
 		return addChaptersInPlace(mp3Path, markers)
 	} else {
 		// Copy to a new file and add tags
@@ -32,17 +30,24 @@ func AddChapters(mp3Path string, markers []csvparser.MarkerEntry, outputPath str
 	}
 }
 
+// generateOutputPath generates an output file path from the input file path
+func generateOutputPath(inputPath string) string {
+	ext := filepath.Ext(inputPath)
+	baseName := inputPath[:len(inputPath)-len(ext)]
+	return baseName + "_with_chapters" + ext
+}
+
 // addChaptersInPlace adds chapter tags directly to an existing MP3 file
 func addChaptersInPlace(mp3Path string, markers []csvparser.MarkerEntry) error {
-	// Ask for confirmation before modifying the original file
+	// Confirm before modifying the original file
 	if err := confirmOperation(fmt.Sprintf("This will modify the original file '%s'. Continue? (y/n): ", mp3Path)); err != nil {
 		return err
 	}
 
-	// Open the MP3 file
+	// Open MP3 file
 	tag, err := id3v2.Open(mp3Path, id3v2.Options{Parse: true})
 	if err != nil {
-		return fmt.Errorf("could not open MP3 file: %w", err)
+		return fmt.Errorf("Cannot open MP3 file: %w", err)
 	}
 	defer tag.Close()
 
@@ -55,18 +60,18 @@ func addChaptersInPlace(mp3Path string, markers []csvparser.MarkerEntry) error {
 	return tag.Save()
 }
 
-// confirmOperation asks the user for confirmation before proceeding with an operation
+// confirmOperation asks for user confirmation before proceeding with an operation
 func confirmOperation(prompt string) error {
 	fmt.Print(prompt)
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("error reading input: %w", err)
+		return fmt.Errorf("Error reading input: %w", err)
 	}
 
 	response = strings.TrimSpace(strings.ToLower(response))
 	if response != "y" && response != "yes" {
-		return fmt.Errorf("operation cancelled by user")
+		return fmt.Errorf("Operation cancelled by user")
 	}
 
 	return nil
@@ -77,32 +82,33 @@ func addChaptersToNewFile(mp3Path string, markers []csvparser.MarkerEntry, outpu
 	// Ensure output directory exists
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+		return fmt.Errorf("Failed to create output directory: %w", err)
 	}
 
-	// Check if output file already exists and ask for confirmation
+	// If output file already exists, ask for confirmation
 	if fileExists(outputPath) {
 		if err := confirmOperation(fmt.Sprintf("File '%s' already exists. Overwrite? (y/n): ", outputPath)); err != nil {
 			return err
 		}
 	}
 
-	// Create temporary file for processing
+	// Create a temporary file for processing
 	tempPath := outputPath + ".tmp"
 	if err := copyFile(mp3Path, tempPath); err != nil {
 		return err
 	}
-	// Make sure to clean up temp file in case of failures
+
+	// Clean up temporary file in case of failure
 	defer func() {
 		if fileExists(tempPath) {
 			os.Remove(tempPath)
 		}
 	}()
 
-	// Add ID3 tags to temporary file
+	// Add ID3 tags to the temporary file
 	tag, err := id3v2.Open(tempPath, id3v2.Options{Parse: true})
 	if err != nil {
-		return fmt.Errorf("failed to open temporary file: %w", err)
+		return fmt.Errorf("Cannot open temporary file: %w", err)
 	}
 
 	// Add chapter tags
@@ -111,16 +117,16 @@ func addChaptersToNewFile(mp3Path string, markers []csvparser.MarkerEntry, outpu
 		return err
 	}
 
-	// Save and close tags
+	// Save and close the tags
 	err = tag.Save()
 	tag.Close()
 	if err != nil {
-		return fmt.Errorf("failed to save tags: %w", err)
+		return fmt.Errorf("Failed to save tags: %w", err)
 	}
 
-	// Move the temporary file to the final output file on success
+	// On success, move the temporary file to the final output file
 	if err := os.Rename(tempPath, outputPath); err != nil {
-		return fmt.Errorf("failed to create final file: %w", err)
+		return fmt.Errorf("Failed to create final file: %w", err)
 	}
 
 	return nil
@@ -131,21 +137,21 @@ func copyFile(src, dst string) error {
 	// Open input file
 	inputFile, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("failed to open input file: %w", err)
+		return fmt.Errorf("Cannot open input file: %w", err)
 	}
 	defer inputFile.Close()
 
 	// Create output file
 	outputFile, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
+		return fmt.Errorf("Failed to create temporary file: %w", err)
 	}
 	defer outputFile.Close()
 
-	// Copy contents from input file to output file
+	// Copy content from input file to output file
 	_, err = io.Copy(outputFile, inputFile)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return fmt.Errorf("Failed to copy file: %w", err)
 	}
 
 	return nil
@@ -153,7 +159,7 @@ func copyFile(src, dst string) error {
 
 // addChapterFrames adds chapter frames to ID3 tags
 func addChapterFrames(tag *id3v2.Tag, markers []csvparser.MarkerEntry) error {
-	// Remove existing chapter and CTOC frames (to avoid duplication)
+	// Delete existing chapter and CTOC frames (to avoid duplicates)
 	tag.DeleteFrames("CHAP")
 	tag.DeleteFrames("CTOC")
 
@@ -177,21 +183,21 @@ func addChapterFrames(tag *id3v2.Tag, markers []csvparser.MarkerEntry) error {
 		// Create chapter frame
 		chapterFrame := createChapterFrame(elementID, marker.Name, marker.StartTime)
 
-		// Add chapter frame to tag
+		// Add chapter frame to the tag
 		tag.AddFrame("CHAP", chapterFrame)
 	}
 
-	// If no valid chapters were created, return
+	// Exit if there are no valid chapters
 	if len(chapterElementIDs) == 0 {
 		return nil
 	}
 
-	// Create Table Of Contents frame referencing all chapters
+	// Create a table of contents frame referencing all chapters
 	tocFrameID := "toc"
 	tocTitle := "Table of Contents"
 	tocFrame := createCTOCFrame(tocFrameID, true, true, chapterElementIDs, tocTitle)
 
-	// Add the CTOC frame to the tag
+	// Add CTOC frame to the tag
 	tag.AddFrame("CTOC", tocFrame)
 
 	return nil
@@ -202,9 +208,9 @@ func createChapterFrame(elementID string, title string, startTime time.Duration)
 	return id3v2.ChapterFrame{
 		ElementID:   elementID,
 		StartTime:   startTime,
-		EndTime:     id3v2.IgnoredOffset,
-		StartOffset: id3v2.IgnoredOffset,
-		EndOffset:   id3v2.IgnoredOffset,
+		EndTime:     id3v2.IgnoredOffset, // Ignore end time
+		StartOffset: id3v2.IgnoredOffset, // Ignore start offset
+		EndOffset:   id3v2.IgnoredOffset, // Ignore end offset
 		Title: &id3v2.TextFrame{
 			Encoding: id3v2.EncodingUTF8,
 			Text:     title,

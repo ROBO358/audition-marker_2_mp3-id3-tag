@@ -6,54 +6,54 @@ import (
 	"github.com/bogem/id3v2/v2"
 )
 
-// CTOCFrame implements the ID3v2 Table of Contents frame (CTOC)
-// as described in the ID3v2 Chapter Frame Addendum (id3v2-chapters-1.0)
+// CTOCFrame implements the ID3v2 Table Of Contents frame (CTOC)
+// As defined in ID3v2 Chapter Frame Addendum (id3v2-chapters-1.0)
 type CTOCFrame struct {
-	ElementID  string   // Unique identifier for this CTOC frame
-	IsTopLevel bool     // Whether this is a top-level table of contents
-	IsOrdered  bool     // Whether the chapters are in a specific order
-	ChildIDs   []string // Element IDs of the child elements (usually CHAP frames)
-	Title      *id3v2.TextFrame
+	ElementID  string           // Unique identifier for this CTOC frame
+	IsTopLevel bool             // Whether this is a top-level table of contents
+	IsOrdered  bool             // Whether chapters are in a specific order
+	ChildIDs   []string         // IDs of child elements (usually CHAP frames)
+	Title      *id3v2.TextFrame // Optional title
 }
 
-// Size returns the size of the frame.
+// Size returns the size of the frame
 func (cf CTOCFrame) Size() int {
 	// Size calculation:
-	// - Element ID (null-terminated string)
+	// - ElementID (null-terminated string)
 	// - Flags (1 byte)
 	// - Entry count (1 byte)
-	// - Child element IDs (null-terminated strings)
-	// - Optional subframe (Title) if present
+	// - Child element IDs (each null-terminated)
+	// - Optional subframe (Title) (if present)
 
 	size := len(cf.ElementID) + 1 // ElementID is null-terminated
 	size += 1                     // Flags byte
 	size += 1                     // Entry count byte
 
-	// Add size of child element IDs (each is null-terminated)
+	// Add size of child element IDs (each null-terminated)
 	for _, id := range cf.ChildIDs {
 		size += len(id) + 1
 	}
 
 	// Add size of optional Title subframe if present
 	if cf.Title != nil {
-		// Add frame ID (4 bytes) + size (4 bytes) + flags (2 bytes) + frame content
+		// Frame ID (4 bytes) + Size (4 bytes) + Flags (2 bytes) + Frame content
 		size += 10 + cf.Title.Size()
 	}
 
 	return size
 }
 
-// UniqueIdentifier returns "CTOC".
+// UniqueIdentifier returns "CTOC"
 func (cf CTOCFrame) UniqueIdentifier() string {
 	return "CTOC"
 }
 
-// WriteTo writes the frame to the writer.
+// WriteTo writes the frame to a writer
 func (cf CTOCFrame) WriteTo(w io.Writer) (int64, error) {
 	var n int64
 	var written int
 
-	// Write Element ID (null-terminated)
+	// Write ElementID (null-terminated)
 	written, err := w.Write(append([]byte(cf.ElementID), 0))
 	n += int64(written)
 	if err != nil {
@@ -63,7 +63,7 @@ func (cf CTOCFrame) WriteTo(w io.Writer) (int64, error) {
 	// Prepare and write flags byte
 	flags := byte(0)
 	if cf.IsTopLevel {
-		flags |= 1 // Set bit 0 if top level
+		flags |= 1 // Set bit 0 if top-level
 	}
 	if cf.IsOrdered {
 		flags |= 2 // Set bit 1 if ordered
@@ -93,7 +93,7 @@ func (cf CTOCFrame) WriteTo(w io.Writer) (int64, error) {
 
 	// Write optional Title subframe if present
 	if cf.Title != nil {
-		// Write frame ID (4 bytes)
+		// Write frame ID (4 bytes: "TIT2")
 		written, err = w.Write([]byte("TIT2"))
 		n += int64(written)
 		if err != nil {
@@ -131,7 +131,7 @@ func (cf CTOCFrame) WriteTo(w io.Writer) (int64, error) {
 	return n, nil
 }
 
-// createCTOCFrame creates a new CTOC frame with the given parameters
+// createCTOCFrame creates a new CTOC frame with the specified parameters
 func createCTOCFrame(elementID string, isTopLevel, isOrdered bool, childIDs []string, title string) CTOCFrame {
 	ctocFrame := CTOCFrame{
 		ElementID:  elementID,
@@ -140,7 +140,7 @@ func createCTOCFrame(elementID string, isTopLevel, isOrdered bool, childIDs []st
 		ChildIDs:   childIDs,
 	}
 
-	// Add title if provided
+	// Add title if present
 	if title != "" {
 		ctocFrame.Title = &id3v2.TextFrame{
 			Encoding: id3v2.EncodingUTF8,

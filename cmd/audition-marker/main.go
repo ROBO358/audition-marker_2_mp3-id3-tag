@@ -11,14 +11,99 @@ import (
 	"github.com/ROBO358/audition-marker_2_mp3-id3-tag/pkg/id3tag"
 )
 
-// Execute runs the main logic of the application
+// Config holds the application settings
+type Config struct {
+	CSVPath   string // Path to the marker CSV file
+	InputMP3  string // Path to the original MP3 file
+	OutputMP3 string // Path for the output MP3 with chapters
+}
+
+// Execute runs the main application logic
 func Execute() {
+	// Parse and validate command line arguments
+	config, err := parseAndValidateArgs()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	// Parse markers from CSV file
+	fmt.Printf("Parsing CSV file '%s'...\n", config.CSVPath)
+	markers, err := csvparser.ParseAuditionCSV(config.CSVPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error occurred while parsing CSV: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Display marker information
+	showMarkerInfo(markers)
+
+	// Add chapter tags to MP3 file
+	fmt.Println("Adding chapter tags to MP3 file...")
+	err = id3tag.AddChapters(config.InputMP3, markers, config.OutputMP3)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error occurred while adding chapter tags: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Determine output file path
+	targetFile := determineOutputPath(config.InputMP3, config.OutputMP3)
+
+	// Display success message
+	showSuccessMessage(targetFile)
+
+	// Verify and display chapters from output file
+	verifyAndShowChapters(targetFile)
+}
+
+// parseAndValidateArgs parses and validates command line arguments
+func parseAndValidateArgs() (*Config, error) {
 	// Define command line options
-	csvPath := flag.String("csv", "", "Path to CSV file containing Adobe Audition marker information (required)")
-	inputMP3 := flag.String("input", "", "Path to the original MP3 file to add chapters to (required)")
-	outputMP3 := flag.String("output", "", "Output path for MP3 file with chapters added (creates filename_with_chapters.mp3 if not specified)")
+	csvPath := flag.String("csv", "", "Path to CSV file containing Adobe Audition markers (required)")
+	inputMP3 := flag.String("input", "", "Path to original MP3 file to add chapters to (required)")
+	outputMP3 := flag.String("output", "", "Path for output MP3 file with chapters (if not specified, will output as filename_with_chapters.mp3)")
 
 	// Customize help message
+	customizeHelpMessage()
+
+	flag.Parse()
+
+	// Create configuration
+	config := &Config{
+		CSVPath:   *csvPath,
+		InputMP3:  *inputMP3,
+		OutputMP3: *outputMP3,
+	}
+
+	// Validate required options
+	if config.CSVPath == "" || config.InputMP3 == "" {
+		return nil, fmt.Errorf("CSV file path and input MP3 path are required")
+	}
+
+	// Check file existence
+	if !fileExists(config.CSVPath) {
+		return nil, fmt.Errorf("CSV file '%s' not found", config.CSVPath)
+	}
+
+	if !fileExists(config.InputMP3) {
+		return nil, fmt.Errorf("Input MP3 file '%s' not found", config.InputMP3)
+	}
+
+	// Check file extensions
+	if !strings.EqualFold(filepath.Ext(config.InputMP3), ".mp3") {
+		return nil, fmt.Errorf("Input file '%s' is not an MP3 file", config.InputMP3)
+	}
+
+	if config.OutputMP3 != "" && !strings.EqualFold(filepath.Ext(config.OutputMP3), ".mp3") {
+		return nil, fmt.Errorf("Output file '%s' does not have MP3 extension", config.OutputMP3)
+	}
+
+	return config, nil
+}
+
+// customizeHelpMessage customizes the help message
+func customizeHelpMessage() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s -csv <CSV file path> -input <input MP3 path> [-output <output MP3 path>]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Options:\n")
@@ -26,110 +111,66 @@ func Execute() {
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  Add chapters and save as podcast_with_chapters.mp3:\n")
 		fmt.Fprintf(os.Stderr, "  %s -csv \"marker.csv\" -input \"podcast.mp3\"\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  Save with a custom output filename:\n")
+		fmt.Fprintf(os.Stderr, "  Save with custom output filename:\n")
 		fmt.Fprintf(os.Stderr, "  %s -csv \"marker.csv\" -input \"podcast.mp3\" -output \"custom_filename.mp3\"\n", os.Args[0])
 	}
+}
 
-	flag.Parse()
-
-	// Validate required options
-	if *csvPath == "" || *inputMP3 == "" {
-		fmt.Fprintln(os.Stderr, "Error: CSV file path and input MP3 path are required")
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	// Check if files exist
-	if !fileExists(*csvPath) {
-		fmt.Fprintf(os.Stderr, "Error: CSV file '%s' not found\n", *csvPath)
-		os.Exit(1)
-	}
-
-	if !fileExists(*inputMP3) {
-		fmt.Fprintf(os.Stderr, "Error: Input MP3 file '%s' not found\n", *inputMP3)
-		os.Exit(1)
-	}
-
-	// Check file extensions
-	if !strings.EqualFold(filepath.Ext(*inputMP3), ".mp3") {
-		fmt.Fprintf(os.Stderr, "Error: Input file '%s' is not an MP3 file\n", *inputMP3)
-		os.Exit(1)
-	}
-
-	if *outputMP3 != "" && !strings.EqualFold(filepath.Ext(*outputMP3), ".mp3") {
-		fmt.Fprintf(os.Stderr, "Error: Output file '%s' does not have an MP3 extension\n", *outputMP3)
-		os.Exit(1)
-	}
-
-	// Parse CSV file
-	fmt.Printf("Parsing CSV file '%s'...\n", *csvPath)
-	markers, err := csvparser.ParseAuditionCSV(*csvPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error occurred while parsing CSV: %v\n", err)
-		os.Exit(1)
-	}
-
+// showMarkerInfo displays marker information
+func showMarkerInfo(markers []csvparser.MarkerEntry) {
 	if len(markers) == 0 {
-		fmt.Println("Warning: No markers found in the CSV file")
+		fmt.Println("Warning: No markers found in CSV file")
 	} else {
 		fmt.Printf("Loaded %d markers\n", len(markers))
 	}
+}
 
-	// Add ID3 tags to MP3 file
-	fmt.Println("Adding chapter tags to MP3 file...")
-	err = id3tag.AddChapters(*inputMP3, markers, *outputMP3)
+// determineOutputPath determines the output file path
+func determineOutputPath(inputPath, outputPath string) string {
+	if outputPath != "" {
+		return outputPath
+	}
+
+	// Calculate automatically generated output path
+	ext := filepath.Ext(inputPath)
+	baseName := inputPath[:len(inputPath)-len(ext)]
+	return baseName + "_with_chapters" + ext
+}
+
+// showSuccessMessage displays success message
+func showSuccessMessage(outputPath string) {
+	fmt.Printf("Done! MP3 file with chapter tags has been saved to '%s'\n", outputPath)
+}
+
+// verifyAndShowChapters reads and displays chapters from the output file
+func verifyAndShowChapters(filePath string) {
+	fmt.Println("\nVerifying chapters in output file:")
+
+	// Get chapter information
+	chapters, err := id3tag.ReadChapters(filePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error occurred while adding chapter tags: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Determine which file has the chapters
-	var targetFile string
-	if *outputMP3 != "" {
-		targetFile = *outputMP3
-	} else {
-		// Calculate the auto-generated output path
-		ext := filepath.Ext(*inputMP3)
-		baseName := (*inputMP3)[:len(*inputMP3)-len(ext)]
-		targetFile = baseName + "_with_chapters" + ext
-	}
-
-	// Success message
-	if *outputMP3 == "" {
-		// Determine the auto-generated output path
-		ext := filepath.Ext(*inputMP3)
-		baseName := (*inputMP3)[:len(*inputMP3)-len(ext)]
-		generatedOutput := baseName + "_with_chapters" + ext
-		fmt.Printf("Complete! MP3 file with chapter tags output to '%s'\n", generatedOutput)
-	} else {
-		fmt.Printf("Complete! MP3 file with chapter tags output to '%s'\n", *outputMP3)
-	}
-
-	// Read and display the chapters from the output file
-	fmt.Println("\nVerifying chapters in the output file:")
-	chapters, err := id3tag.ReadChapters(targetFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Could not read chapters from the output file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: Could not read chapters from output file: %v\n", err)
 		return
 	}
 
 	if len(chapters) == 0 {
-		fmt.Println("No chapters found in the output file.")
+		fmt.Println("No chapters found in output file.")
 		return
 	}
 
-	// Try to read TOC information
-	tocInfo, tocErr := id3tag.ReadTOC(targetFile)
+	// Read table of contents information
+	tocInfo, tocErr := id3tag.ReadTOC(filePath)
 	if tocErr == nil {
 		fmt.Println("Table of Contents information:")
 		fmt.Printf("Title: %s\n", tocInfo.Title)
-		fmt.Printf("Is Top Level: %t\n", tocInfo.IsTopLevel)
-		fmt.Printf("Is Ordered: %t\n", tocInfo.IsOrdered)
-		fmt.Printf("Child Elements: %d\n", len(tocInfo.ChildIDs))
+		fmt.Printf("Top level: %t\n", tocInfo.IsTopLevel)
+		fmt.Printf("Ordered: %t\n", tocInfo.IsOrdered)
+		fmt.Printf("Child elements: %d\n", len(tocInfo.ChildIDs))
 		fmt.Println("------------------------------------------------------------")
 	}
 
-	fmt.Printf("Found %d chapters in the output file:\n", len(chapters))
+	// Display chapter list
+	fmt.Printf("Found %d chapters in output file:\n", len(chapters))
 	fmt.Println("------------------------------------------------------------")
 	fmt.Printf("%-4s | %-12s | %s\n", "No.", "Start Time", "Title")
 	fmt.Println("------------------------------------------------------------")
