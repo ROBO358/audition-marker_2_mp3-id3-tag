@@ -18,11 +18,11 @@ go run ./... -csv <CSVファイルパス> -input <入力MP3パス> [-output <出
 
 - `-csv`: Adobe Audition のマーカー CSV ファイルのパス（必須）
 - `-input`: チャプターを追加する元の MP3 ファイルのパス（必須）
-- `-output`: チャプターを追加した MP3 ファイルの出力パス（指定しない場合は入力ファイルを上書き）
+- `-output`: チャプターを追加した MP3 ファイルの出力パス（指定しない場合は "ファイル名_with_chapters.mp3" として出力）
 
 ## 例
 
-MP3 ファイルを上書きしてチャプターを追加:
+チャプターを追加して "podcast_with_chapters.mp3" として保存:
 
 ```
 go run ./... -csv "marker.csv" -input "podcast.mp3"

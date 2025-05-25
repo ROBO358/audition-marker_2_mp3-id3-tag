@@ -15,9 +15,11 @@ import (
 
 // AddChapters adds chapter tags to an MP3 file
 func AddChapters(mp3Path string, markers []csvparser.MarkerEntry, outputPath string) error {
-	// If output path is not specified, overwrite the input file
+	// If output path is not specified, create a new file with "_with_chapters" suffix
 	if outputPath == "" {
-		outputPath = mp3Path
+		ext := filepath.Ext(mp3Path)
+		baseName := mp3Path[:len(mp3Path)-len(ext)]
+		outputPath = baseName + "_with_chapters" + ext
 	}
 
 	// If input and output files are the same

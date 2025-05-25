@@ -16,7 +16,7 @@ func Execute() {
 	// Define command line options
 	csvPath := flag.String("csv", "", "Path to CSV file containing Adobe Audition marker information (required)")
 	inputMP3 := flag.String("input", "", "Path to the original MP3 file to add chapters to (required)")
-	outputMP3 := flag.String("output", "", "Output path for MP3 file with chapters added (overwrites input file if not specified)")
+	outputMP3 := flag.String("output", "", "Output path for MP3 file with chapters added (creates filename_with_chapters.mp3 if not specified)")
 
 	// Customize help message
 	flag.Usage = func() {
@@ -24,10 +24,10 @@ func Execute() {
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  Add chapters by overwriting the MP3 file:\n")
+		fmt.Fprintf(os.Stderr, "  Add chapters and save as podcast_with_chapters.mp3:\n")
 		fmt.Fprintf(os.Stderr, "  %s -csv \"marker.csv\" -input \"podcast.mp3\"\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  Save as a separate file:\n")
-		fmt.Fprintf(os.Stderr, "  %s -csv \"marker.csv\" -input \"podcast.mp3\" -output \"podcast_with_chapters.mp3\"\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  Save with a custom output filename:\n")
+		fmt.Fprintf(os.Stderr, "  %s -csv \"marker.csv\" -input \"podcast.mp3\" -output \"custom_filename.mp3\"\n", os.Args[0])
 	}
 
 	flag.Parse()
@@ -84,14 +84,23 @@ func Execute() {
 	}
 
 	// Determine which file has the chapters
-	targetFile := *inputMP3
+	var targetFile string
 	if *outputMP3 != "" {
 		targetFile = *outputMP3
+	} else {
+		// Calculate the auto-generated output path
+		ext := filepath.Ext(*inputMP3)
+		baseName := (*inputMP3)[:len(*inputMP3)-len(ext)]
+		targetFile = baseName + "_with_chapters" + ext
 	}
 
 	// Success message
 	if *outputMP3 == "" {
-		fmt.Printf("Complete! Chapter tags added to MP3 file '%s'\n", *inputMP3)
+		// Determine the auto-generated output path
+		ext := filepath.Ext(*inputMP3)
+		baseName := (*inputMP3)[:len(*inputMP3)-len(ext)]
+		generatedOutput := baseName + "_with_chapters" + ext
+		fmt.Printf("Complete! MP3 file with chapter tags output to '%s'\n", generatedOutput)
 	} else {
 		fmt.Printf("Complete! MP3 file with chapter tags output to '%s'\n", *outputMP3)
 	}
